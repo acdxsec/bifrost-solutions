@@ -1,0 +1,13 @@
+apps:
+  6bdf00f4-b05c-4ad3-a855-e66403041f77:
+    id: 6bdf00f4-b05c-4ad3-a855-e66403041f77
+    slug: m365-license-dashboard
+    name: Microsoft 365 License Dashboard
+    description: Cross-tenant Microsoft 365 license inventory for mapped customer
+      organizations.
+    app_model: standalone_v2
+    dependencies: {}
+    access_level: authenticated
+    roles: []
+    role_names: null
+    path: apps/m365-license-dashboard

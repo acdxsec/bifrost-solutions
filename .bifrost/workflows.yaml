@@ -1,0 +1,97 @@
+workflows:
+  95155ac8-3692-460b-a208-32946905704d:
+    id: 95155ac8-3692-460b-a208-32946905704d
+    name: m365_license_inventory
+    path: functions/license_inventory.py
+    function_name: m365_license_inventory
+    type: workflow
+    description: Retrieve Microsoft 365 subscribed SKU inventory across all Microsoft
+      365 Graph organization mappings.
+    access_level: authenticated
+    timeout_seconds: 1800
+    source: "import asyncio\nfrom datetime import datetime, timezone\n\nimport httpx\n\
+      \nfrom bifrost import integrations, organizations, workflow\n\n\nINTEGRATION_NAME\
+      \ = \"Microsoft 365 Graph\"\nGRAPH_URL = (\n    \"https://graph.microsoft.com/v1.0/subscribedSkus\"\
+      \n    \"?$select=id,accountName,accountId,appliesTo,capabilityStatus,\"\n  \
+      \  \"consumedUnits,prepaidUnits,skuId,skuPartNumber,subscriptionIds\"\n)\n\n\
+      \nasync def _organization_name(org_id: str, fallback: str | None) -> str:\n\
+      \    try:\n        org = await organizations.get(org_id)\n        return org.name\n\
+      \    except Exception:\n        return fallback or org_id\n\n\nasync def _fetch_tenant(mapping,\
+      \ client: httpx.AsyncClient, semaphore: asyncio.Semaphore):\n    async with\
+      \ semaphore:\n        org_id = str(mapping.organization_id)\n        tenant_id\
+      \ = str(mapping.entity_id)\n        org_name = await _organization_name(org_id,\
+      \ mapping.entity_name)\n\n        microsoft = await integrations.get(\n    \
+      \        INTEGRATION_NAME,\n            scope=org_id,\n        )\n\n       \
+      \ if microsoft is None:\n            raise RuntimeError(\"Microsoft 365 Graph\
+      \ integration is unavailable\")\n\n        if microsoft.oauth is None or not\
+      \ microsoft.oauth.access_token:\n            raise RuntimeError(\"Microsoft\
+      \ Graph access token is unavailable\")\n\n        response = await client.get(\n\
+      \            GRAPH_URL,\n            headers={\n                \"Authorization\"\
+      : f\"Bearer {microsoft.oauth.access_token}\",\n                \"Accept\": \"\
+      application/json\",\n            },\n        )\n\n        if response.status_code\
+      \ != 200:\n            try:\n                body = response.json()\n      \
+      \          graph_error = body.get(\"error\", {})\n                detail = graph_error.get(\"\
+      message\") or response.text\n            except Exception:\n               \
+      \ detail = response.text\n\n            raise RuntimeError(\n              \
+      \  f\"Microsoft Graph returned HTTP {response.status_code}: {detail}\"\n   \
+      \         )\n\n        rows = []\n\n        for sku in response.json().get(\"\
+      value\", []):\n            prepaid = sku.get(\"prepaidUnits\") or {}\n\n   \
+      \         enabled = int(prepaid.get(\"enabled\") or 0)\n            warning\
+      \ = int(prepaid.get(\"warning\") or 0)\n            suspended = int(prepaid.get(\"\
+      suspended\") or 0)\n            locked_out = int(prepaid.get(\"lockedOut\")\
+      \ or 0)\n            assigned = int(sku.get(\"consumedUnits\") or 0)\n\n   \
+      \         total_units = enabled + warning + suspended + locked_out\n       \
+      \     available = max(enabled - assigned, 0)\n            subscription_ids =\
+      \ sku.get(\"subscriptionIds\") or []\n\n            rows.append(\n         \
+      \       {\n                    \"organizationId\": org_id,\n               \
+      \     \"organizationName\": org_name,\n                    \"tenantId\": tenant_id,\n\
+      \                    \"accountName\": sku.get(\"accountName\"),\n          \
+      \          \"accountId\": sku.get(\"accountId\"),\n                    \"appliesTo\"\
+      : sku.get(\"appliesTo\"),\n                    \"skuId\": sku.get(\"skuId\"\
+      ),\n                    \"skuPartNumber\": sku.get(\"skuPartNumber\"),\n   \
+      \                 \"status\": sku.get(\"capabilityStatus\"),\n             \
+      \       \"totalUnits\": total_units,\n                    \"enabledUnits\":\
+      \ enabled,\n                    \"assignedUnits\": assigned,\n             \
+      \       \"availableUnits\": available,\n                    \"warningUnits\"\
+      : warning,\n                    \"suspendedUnits\": suspended,\n           \
+      \         \"lockedOutUnits\": locked_out,\n                    \"subscriptionIds\"\
+      : subscription_ids,\n                    \"subscriptionCount\": len(subscription_ids),\n\
+      \                }\n            )\n\n        return {\n            \"organizationId\"\
+      : org_id,\n            \"organizationName\": org_name,\n            \"tenantId\"\
+      : tenant_id,\n            \"licenses\": rows,\n        }\n\n\n@workflow\nasync\
+      \ def m365_license_inventory() -> dict:\n    \"\"\"Return Microsoft 365 license\
+      \ inventory across every mapped tenant.\"\"\"\n\n    mappings = await integrations.list_mappings(INTEGRATION_NAME)\n\
+      \n    if mappings is None:\n        raise RuntimeError(f\"Integration '{INTEGRATION_NAME}'\
+      \ was not found\")\n\n    usable_mappings = [\n        mapping\n        for\
+      \ mapping in mappings\n        if mapping.organization_id and mapping.entity_id\n\
+      \    ]\n\n    semaphore = asyncio.Semaphore(8)\n    licenses = []\n    tenants\
+      \ = []\n    errors = []\n\n    async with httpx.AsyncClient(timeout=60) as client:\n\
+      \        tasks = [\n            _fetch_tenant(mapping, client, semaphore)\n\
+      \            for mapping in usable_mappings\n        ]\n\n        results =\
+      \ await asyncio.gather(*tasks, return_exceptions=True)\n\n    for mapping, result\
+      \ in zip(usable_mappings, results):\n        if isinstance(result, Exception):\n\
+      \            errors.append(\n                {\n                    \"organizationId\"\
+      : str(mapping.organization_id),\n                    \"organizationName\": mapping.entity_name\n\
+      \                    or str(mapping.organization_id),\n                    \"\
+      tenantId\": str(mapping.entity_id),\n                    \"error\": str(result),\n\
+      \                }\n            )\n            continue\n\n        tenants.append(\n\
+      \            {\n                \"organizationId\": result[\"organizationId\"\
+      ],\n                \"organizationName\": result[\"organizationName\"],\n  \
+      \              \"tenantId\": result[\"tenantId\"],\n                \"skuCount\"\
+      : len(result[\"licenses\"]),\n            }\n        )\n        licenses.extend(result[\"\
+      licenses\"])\n\n    licenses.sort(\n        key=lambda row: (\n            (row.get(\"\
+      organizationName\") or \"\").casefold(),\n            (row.get(\"skuPartNumber\"\
+      ) or \"\").casefold(),\n        )\n    )\n\n    total_units = sum(row[\"totalUnits\"\
+      ] for row in licenses)\n    enabled_units = sum(row[\"enabledUnits\"] for row\
+      \ in licenses)\n    assigned_units = sum(row[\"assignedUnits\"] for row in licenses)\n\
+      \    available_units = sum(row[\"availableUnits\"] for row in licenses)\n\n\
+      \    return {\n        \"generatedAt\": datetime.now(timezone.utc).isoformat(),\n\
+      \        \"summary\": {\n            \"mappedTenants\": len(usable_mappings),\n\
+      \            \"tenantsSucceeded\": len(tenants),\n            \"tenantsFailed\"\
+      : len(errors),\n            \"licenseSkuRows\": len(licenses),\n           \
+      \ \"subscriptionReferences\": sum(\n                row[\"subscriptionCount\"\
+      ] for row in licenses\n            ),\n            \"totalUnits\": total_units,\n\
+      \            \"enabledUnits\": enabled_units,\n            \"assignedUnits\"\
+      : assigned_units,\n            \"availableUnits\": available_units,\n      \
+      \  },\n        \"tenants\": tenants,\n        \"licenses\": licenses,\n    \
+      \    \"errors\": errors,\n    }\n"
