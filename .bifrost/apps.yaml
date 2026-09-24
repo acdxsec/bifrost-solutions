@@ -3,8 +3,8 @@ apps:
     id: 6bdf00f4-b05c-4ad3-a855-e66403041f77
     slug: m365-license-dashboard
     name: Microsoft 365 License Dashboard
-    description: Cross-tenant Microsoft 365 license inventory for mapped customer
-      organizations.
+    description: MSP Microsoft 365 license inventory for GDAP-managed Partner Center
+      customers.
     app_model: standalone_v2
     dependencies: {}
     access_level: authenticated

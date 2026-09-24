@@ -1,0 +1,109 @@
+tables:
+  79d9601c-22a7-4b54-9fd8-731fa0fed8dc:
+    id: 79d9601c-22a7-4b54-9fd8-731fa0fed8dc
+    name: m365_managed_tenants
+    description: GDAP-managed Microsoft customer tenants discovered through Partner Center.
+    schema:
+      type: object
+      properties:
+        tenantId:
+          type: string
+        customerName:
+          type: string
+        defaultDomain:
+          type: string
+        relationshipStatus:
+          type: string
+        skuCount:
+          type: integer
+        lastSyncAt:
+          type: string
+        lastError:
+          type: string
+    policies:
+      - name: solution_authenticated_access
+        actions: [read, create, update, delete]
+        when: null
+  42782eb5-6514-42e6-b915-bd70f2dce0a1:
+    id: 42782eb5-6514-42e6-b915-bd70f2dce0a1
+    name: m365_license_inventory
+    description: Current Microsoft 365 license inventory by customer tenant and SKU.
+    schema:
+      type: object
+      properties:
+        tenantId:
+          type: string
+        organizationName:
+          type: string
+        skuId:
+          type: string
+        skuPartNumber:
+          type: string
+        totalUnits:
+          type: integer
+        assignedUnits:
+          type: integer
+        availableUnits:
+          type: integer
+        nextLifecycleDateTime:
+          type: string
+        syncedAt:
+          type: string
+    policies:
+      - name: solution_authenticated_access
+        actions: [read, create, update, delete]
+        when: null
+  d51c7d16-f0a3-4eec-9c87-7cb6e7c9f1b0:
+    id: d51c7d16-f0a3-4eec-9c87-7cb6e7c9f1b0
+    name: m365_license_history
+    description: Historical Microsoft 365 license inventory snapshots by sync run.
+    schema:
+      type: object
+      properties:
+        tenantId:
+          type: string
+        skuId:
+          type: string
+        skuPartNumber:
+          type: string
+        totalUnits:
+          type: integer
+        assignedUnits:
+          type: integer
+        availableUnits:
+          type: integer
+        syncId:
+          type: string
+        syncedAt:
+          type: string
+    policies:
+      - name: solution_authenticated_access
+        actions: [read, create, update, delete]
+        when: null
+  518c33f3-7a15-4a1c-a887-faa8d2bf9013:
+    id: 518c33f3-7a15-4a1c-a887-faa8d2bf9013
+    name: m365_license_sync_runs
+    description: Microsoft 365 license sync run status and errors.
+    schema:
+      type: object
+      properties:
+        syncId:
+          type: string
+        startedAt:
+          type: string
+        finishedAt:
+          type: string
+        status:
+          type: string
+        customersDiscovered:
+          type: integer
+        tenantsSucceeded:
+          type: integer
+        tenantsFailed:
+          type: integer
+        licenseSkuRows:
+          type: integer
+    policies:
+      - name: solution_authenticated_access
+        actions: [read, create, update, delete]
+        when: null

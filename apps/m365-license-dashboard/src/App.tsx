@@ -6,7 +6,11 @@ import {
   Search,
   ShieldAlert,
 } from "lucide-react";
-import { BifrostHeader, useWorkflowQuery } from "bifrost";
+import {
+  BifrostHeader,
+  useWorkflowMutation,
+  useWorkflowQuery,
+} from "bifrost";
 
 type LicenseRow = {
   organizationId: string;
@@ -58,6 +62,19 @@ type TenantWarning = {
 
 type InventoryResult = {
   generatedAt: string;
+  source?: string;
+  lastSync?: {
+    syncId: string;
+    startedAt: string;
+    finishedAt: string;
+    status: string;
+    customersDiscovered: number;
+    tenantsSucceeded: number;
+    tenantsFailed: number;
+    licenseSkuRows: number;
+    errors: TenantError[];
+    warnings: TenantWarning[];
+  } | null;
   summary: {
     mappedTenants: number;
     tenantsSucceeded: number;
@@ -82,6 +99,8 @@ type InventoryResult = {
 
 const WORKFLOW_REF =
   "functions/license_inventory.py::m365_license_inventory";
+const SYNC_WORKFLOW_REF =
+  "functions/license_inventory.py::m365_sync_license_inventory";
 
 function number(value: number) {
   return new Intl.NumberFormat().format(value);
@@ -132,10 +151,35 @@ function Metric({
 
 export default function App() {
   const inventory = useWorkflowQuery<InventoryResult>(WORKFLOW_REF);
+  const syncInventory =
+    useWorkflowMutation<InventoryResult>(SYNC_WORKFLOW_REF);
   const [search, setSearch] = useState("");
   const [tenant, setTenant] = useState("all");
   const [status, setStatus] = useState("all");
   const warnings = inventory.data?.warnings ?? [];
+  const inventoryLoading =
+    "isLoading" in inventory
+      ? Boolean(inventory.isLoading)
+      : Boolean(inventory.loading);
+  const syncLoading =
+    "isLoading" in syncInventory
+      ? Boolean(syncInventory.isLoading)
+      : Boolean(syncInventory.loading);
+  const inventoryError =
+    "isError" in inventory
+      ? Boolean(inventory.isError)
+      : Boolean(inventory.error);
+  const inventoryErrorMessage =
+    "errorMessage" in inventory
+      ? inventory.errorMessage
+      : inventory.error?.message;
+  const refreshInventory =
+    "refetch" in inventory ? inventory.refetch : inventory.refresh;
+  const runSync =
+    "execute" in syncInventory
+      ? syncInventory.execute
+      : syncInventory.mutate;
+  const isRefreshing = inventoryLoading || syncLoading;
 
   const tenantOptions = useMemo(() => {
     const names = new Set(
@@ -204,18 +248,21 @@ export default function App() {
 
           <button
             className="primary-button"
-            onClick={() => void inventory.refetch()}
-            disabled={inventory.isLoading}
+            onClick={() =>
+              void runSync()
+                .then(() => refreshInventory())
+            }
+            disabled={isRefreshing}
           >
             <RefreshCw
               size={16}
-              className={inventory.isLoading ? "spin" : ""}
+              className={isRefreshing ? "spin" : ""}
             />
-            {inventory.isLoading ? "Refreshing" : "Refresh"}
+            {isRefreshing ? "Refreshing" : "Sync"}
           </button>
         </section>
 
-        {inventory.isLoading && !inventory.data ? (
+        {inventoryLoading && !inventory.data ? (
           <section className="state-card">
             <RefreshCw size={22} className="spin" />
             <div>
@@ -225,13 +272,13 @@ export default function App() {
           </section>
         ) : null}
 
-        {inventory.isError ? (
+        {inventoryError ? (
           <section className="state-card state-error">
             <AlertCircle size={22} />
             <div>
               <strong>Inventory workflow failed</strong>
               <span>
-                {inventory.errorMessage ?? "Unknown workflow error"}
+                {inventoryErrorMessage ?? "Unknown workflow error"}
               </span>
             </div>
           </section>
@@ -328,6 +375,11 @@ export default function App() {
                     inventory.data.generatedAt,
                   ).toLocaleString()}
                 </span>
+                {inventory.data.lastSync ? (
+                  <span>
+                    Source <strong>Partner Center</strong>
+                  </span>
+                ) : null}
               </div>
 
               <div className="table-scroll">
