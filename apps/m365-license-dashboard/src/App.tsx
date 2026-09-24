@@ -26,7 +26,20 @@ type LicenseRow = {
   suspendedUnits: number;
   lockedOutUnits: number;
   subscriptionIds: string[];
+  subscriptionDetails: Array<{
+    subscriptionId: string;
+    id?: string | null;
+    commerceSubscriptionId?: string | null;
+    ocpSubscriptionId?: string | null;
+    createdDateTime?: string | null;
+    nextLifecycleDateTime?: string | null;
+    status?: string | null;
+    totalLicenses?: number | null;
+    isTrial?: boolean | null;
+  }>;
   subscriptionCount: number;
+  nextLifecycleDateTime: string | null;
+  lifecycleLookupError: string | null;
 };
 
 type TenantError = {
@@ -34,6 +47,13 @@ type TenantError = {
   organizationName: string;
   tenantId: string;
   error: string;
+};
+
+type TenantWarning = {
+  organizationId: string;
+  organizationName: string;
+  tenantId: string;
+  warning: string;
 };
 
 type InventoryResult = {
@@ -57,6 +77,7 @@ type InventoryResult = {
   }>;
   licenses: LicenseRow[];
   errors: TenantError[];
+  warnings: TenantWarning[];
 };
 
 const WORKFLOW_REF =
@@ -69,6 +90,16 @@ function number(value: number) {
 function percent(assigned: number, total: number) {
   if (!total) return "—";
   return `${Math.round((assigned / total) * 100)}%`;
+}
+
+function date(value: string | null) {
+  if (!value) return null;
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(value));
 }
 
 function statusClass(status: string | null) {
@@ -104,6 +135,7 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [tenant, setTenant] = useState("all");
   const [status, setStatus] = useState("all");
+  const warnings = inventory.data?.warnings ?? [];
 
   const tenantOptions = useMemo(() => {
     const names = new Set(
@@ -143,6 +175,7 @@ export default function App() {
         row.skuPartNumber ?? "",
         row.skuId ?? "",
         row.accountName ?? "",
+        row.nextLifecycleDateTime ?? "",
         ...row.subscriptionIds,
       ]
         .join(" ")
@@ -308,6 +341,7 @@ export default function App() {
                       <th className="numeric">Assigned</th>
                       <th className="numeric">Available</th>
                       <th className="numeric">Use</th>
+                      <th>Next lifecycle</th>
                       <th>Subscriptions</th>
                     </tr>
                   </thead>
@@ -365,6 +399,43 @@ export default function App() {
                           {percent(
                             row.assignedUnits,
                             row.totalUnits,
+                          )}
+                        </td>
+                        <td>
+                          {row.lifecycleLookupError ? (
+                            <span className="secondary-cell">
+                              Unavailable
+                            </span>
+                          ) : (row.subscriptionDetails ?? []).some(
+                              (subscription) =>
+                                subscription.nextLifecycleDateTime,
+                            ) ? (
+                            <div className="lifecycle-list">
+                              {(row.subscriptionDetails ?? []).map(
+                                (subscription) => (
+                                  <div
+                                    className="lifecycle-item"
+                                    key={subscription.subscriptionId}
+                                  >
+                                    <span>
+                                      {date(
+                                        subscription.nextLifecycleDateTime ??
+                                          null,
+                                      ) ?? "Not returned"}
+                                    </span>
+                                    {subscription.status ? (
+                                      <span className="secondary-cell">
+                                        {subscription.status}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ),
+                              )}
+                            </div>
+                          ) : (
+                            <span className="secondary-cell">
+                              Not returned
+                            </span>
                           )}
                         </td>
                         <td>
@@ -428,12 +499,47 @@ export default function App() {
                   ))}
                 </div>
               </section>
-            ) : (
+            ) : null}
+
+            {warnings.length ? (
+              <section className="panel warning-panel">
+                <div className="warning-heading">
+                  <ShieldAlert size={18} />
+                  <div>
+                    <strong>Lifecycle lookup warnings</strong>
+                    <span>
+                      License counts loaded, but Microsoft Graph beta
+                      lifecycle data was unavailable for these tenants.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="error-list">
+                  {warnings.map((warning) => (
+                    <div
+                      className="error-row"
+                      key={`${warning.organizationId}:${warning.tenantId}`}
+                    >
+                      <div>
+                        <strong>{warning.organizationName}</strong>
+                        <span className="mono">
+                          {warning.tenantId}
+                        </span>
+                      </div>
+                      <span>{warning.warning}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {!inventory.data.errors.length &&
+            !warnings.length ? (
               <section className="success-strip">
                 <CheckCircle2 size={17} />
                 All mapped tenants queried successfully.
               </section>
-            )}
+            ) : null}
           </>
         ) : null}
       </main>

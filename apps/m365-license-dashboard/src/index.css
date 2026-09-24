@@ -200,7 +200,7 @@ button {
 
 table {
   width: 100%;
-  min-width: 1120px;
+  min-width: 1320px;
   border-collapse: collapse;
 }
 
@@ -292,6 +292,16 @@ tbody tr:hover {
   font-size: 9px;
 }
 
+.lifecycle-list {
+  display: grid;
+  gap: 6px;
+}
+
+.lifecycle-item {
+  display: grid;
+  gap: 2px;
+}
+
 .subscription-list {
   display: flex;
   max-width: 430px;
@@ -346,6 +356,11 @@ tbody tr:hover {
   border-color: #fecaca;
 }
 
+.warning-panel {
+  margin-top: 18px;
+  border-color: #fde68a;
+}
+
 .error-heading {
   display: flex;
   align-items: flex-start;
@@ -355,7 +370,21 @@ tbody tr:hover {
   color: #b91c1c;
 }
 
+.warning-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border-bottom: 1px solid #fef3c7;
+  color: #b45309;
+}
+
 .error-heading div {
+  display: flex;
+  flex-direction: column;
+}
+
+.warning-heading div {
   display: flex;
   flex-direction: column;
 }
@@ -363,6 +392,12 @@ tbody tr:hover {
 .error-heading span {
   margin-top: 2px;
   color: #7f1d1d;
+  font-size: 11px;
+}
+
+.warning-heading span {
+  margin-top: 2px;
+  color: #92400e;
   font-size: 11px;
 }
 
@@ -474,6 +509,19 @@ tbody tr:hover {
 .dark .subscription-id {
   border-color: #334155;
   background: #0f172a;
+}
+
+.dark .warning-panel {
+  border-color: #854d0e;
+}
+
+.dark .warning-heading {
+  border-color: #713f12;
+  color: #fbbf24;
+}
+
+.dark .warning-heading span {
+  color: #fde68a;
 }
 
 @media (max-width: 1150px) {

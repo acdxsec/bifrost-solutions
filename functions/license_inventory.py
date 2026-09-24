@@ -12,6 +12,11 @@ GRAPH_URL = (
     "?$select=id,accountName,accountId,appliesTo,capabilityStatus,"
     "consumedUnits,prepaidUnits,skuId,skuPartNumber,subscriptionIds"
 )
+SUBSCRIPTIONS_URL = (
+    "https://graph.microsoft.com/beta/directory/subscriptions"
+    "?$select=id,commerceSubscriptionId,ocpSubscriptionId,createdDateTime,"
+    "nextLifecycleDateTime,skuId,skuPartNumber,status,totalLicenses,isTrial"
+)
 
 
 async def _organization_name(org_id: str, fallback: str | None) -> str:
@@ -20,6 +25,58 @@ async def _organization_name(org_id: str, fallback: str | None) -> str:
         return org.name
     except Exception:
         return fallback or org_id
+
+
+def _subscription_key(value: object) -> str | None:
+    if value is None:
+        return None
+    key = str(value).strip().lower()
+    return key or None
+
+
+async def _subscription_lifecycle_lookup(
+    client: httpx.AsyncClient,
+    access_token: str,
+) -> tuple[dict[str, dict], str | None]:
+    response = await client.get(
+        SUBSCRIPTIONS_URL,
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        },
+    )
+
+    if response.status_code != 200:
+        try:
+            body = response.json()
+            graph_error = body.get("error", {})
+            detail = graph_error.get("message") or response.text
+        except Exception:
+            detail = response.text
+
+        return {}, (
+            "Microsoft Graph beta directory subscriptions returned "
+            f"HTTP {response.status_code}: {detail}"
+        )
+
+    lookup: dict[str, dict] = {}
+    for subscription in response.json().get("value", []):
+        normalized = {
+            "id": subscription.get("id"),
+            "commerceSubscriptionId": subscription.get("commerceSubscriptionId"),
+            "ocpSubscriptionId": subscription.get("ocpSubscriptionId"),
+            "createdDateTime": subscription.get("createdDateTime"),
+            "nextLifecycleDateTime": subscription.get("nextLifecycleDateTime"),
+            "status": subscription.get("status"),
+            "totalLicenses": subscription.get("totalLicenses"),
+            "isTrial": subscription.get("isTrial"),
+        }
+        for key_name in ("id", "commerceSubscriptionId", "ocpSubscriptionId"):
+            key = _subscription_key(subscription.get(key_name))
+            if key:
+                lookup[key] = normalized
+
+    return lookup, None
 
 
 async def _fetch_tenant(mapping, client: httpx.AsyncClient, semaphore: asyncio.Semaphore):
@@ -39,10 +96,11 @@ async def _fetch_tenant(mapping, client: httpx.AsyncClient, semaphore: asyncio.S
         if microsoft.oauth is None or not microsoft.oauth.access_token:
             raise RuntimeError("Microsoft Graph access token is unavailable")
 
+        access_token = microsoft.oauth.access_token
         response = await client.get(
             GRAPH_URL,
             headers={
-                "Authorization": f"Bearer {microsoft.oauth.access_token}",
+                "Authorization": f"Bearer {access_token}",
                 "Accept": "application/json",
             },
         )
@@ -59,6 +117,10 @@ async def _fetch_tenant(mapping, client: httpx.AsyncClient, semaphore: asyncio.S
                 f"Microsoft Graph returned HTTP {response.status_code}: {detail}"
             )
 
+        subscription_lookup, lifecycle_error = await _subscription_lifecycle_lookup(
+            client,
+            access_token,
+        )
         rows = []
 
         for sku in response.json().get("value", []):
@@ -73,6 +135,18 @@ async def _fetch_tenant(mapping, client: httpx.AsyncClient, semaphore: asyncio.S
             total_units = enabled + warning + suspended + locked_out
             available = max(enabled - assigned, 0)
             subscription_ids = sku.get("subscriptionIds") or []
+            subscription_details = [
+                {
+                    "subscriptionId": subscription_id,
+                    **subscription_lookup.get(_subscription_key(subscription_id) or "", {}),
+                }
+                for subscription_id in subscription_ids
+            ]
+            lifecycle_dates = [
+                detail.get("nextLifecycleDateTime")
+                for detail in subscription_details
+                if detail.get("nextLifecycleDateTime")
+            ]
 
             rows.append(
                 {
@@ -93,7 +167,12 @@ async def _fetch_tenant(mapping, client: httpx.AsyncClient, semaphore: asyncio.S
                     "suspendedUnits": suspended,
                     "lockedOutUnits": locked_out,
                     "subscriptionIds": subscription_ids,
+                    "subscriptionDetails": subscription_details,
                     "subscriptionCount": len(subscription_ids),
+                    "nextLifecycleDateTime": min(lifecycle_dates)
+                    if lifecycle_dates
+                    else None,
+                    "lifecycleLookupError": lifecycle_error,
                 }
             )
 
@@ -102,6 +181,7 @@ async def _fetch_tenant(mapping, client: httpx.AsyncClient, semaphore: asyncio.S
             "organizationName": org_name,
             "tenantId": tenant_id,
             "licenses": rows,
+            "lifecycleLookupError": lifecycle_error,
         }
 
 
@@ -124,6 +204,7 @@ async def m365_license_inventory() -> dict:
     licenses = []
     tenants = []
     errors = []
+    warnings = []
 
     async with httpx.AsyncClient(timeout=60) as client:
         tasks = [
@@ -155,6 +236,15 @@ async def m365_license_inventory() -> dict:
             }
         )
         licenses.extend(result["licenses"])
+        if result.get("lifecycleLookupError"):
+            warnings.append(
+                {
+                    "organizationId": result["organizationId"],
+                    "organizationName": result["organizationName"],
+                    "tenantId": result["tenantId"],
+                    "warning": result["lifecycleLookupError"],
+                }
+            )
 
     licenses.sort(
         key=lambda row: (
@@ -186,4 +276,5 @@ async def m365_license_inventory() -> dict:
         "tenants": tenants,
         "licenses": licenses,
         "errors": errors,
+        "warnings": warnings,
     }
