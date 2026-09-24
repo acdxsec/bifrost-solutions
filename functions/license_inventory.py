@@ -37,7 +37,7 @@ def _subscription_key(value: object) -> str | None:
 async def _subscription_lifecycle_lookup(
     client: httpx.AsyncClient,
     access_token: str,
-) -> tuple[dict[str, dict], str | None]:
+) -> tuple[dict[str, dict[str, dict | list[dict]]], str | None]:
     response = await client.get(
         SUBSCRIPTIONS_URL,
         headers={
@@ -59,7 +59,11 @@ async def _subscription_lifecycle_lookup(
             f"HTTP {response.status_code}: {detail}"
         )
 
-    lookup: dict[str, dict] = {}
+    lookup: dict[str, dict[str, dict | list[dict]]] = {
+        "by_id": {},
+        "by_sku_id": {},
+        "by_sku_part_number": {},
+    }
     for subscription in response.json().get("value", []):
         normalized = {
             "id": subscription.get("id"),
@@ -74,9 +78,72 @@ async def _subscription_lifecycle_lookup(
         for key_name in ("id", "commerceSubscriptionId", "ocpSubscriptionId"):
             key = _subscription_key(subscription.get(key_name))
             if key:
-                lookup[key] = normalized
+                lookup["by_id"][key] = normalized
+
+        sku_id_key = _subscription_key(subscription.get("skuId"))
+        if sku_id_key:
+            lookup["by_sku_id"].setdefault(sku_id_key, []).append(normalized)
+
+        sku_part_key = _subscription_key(subscription.get("skuPartNumber"))
+        if sku_part_key:
+            lookup["by_sku_part_number"].setdefault(sku_part_key, []).append(normalized)
 
     return lookup, None
+
+
+def _subscription_detail_id(detail: dict) -> str | None:
+    for key_name in ("commerceSubscriptionId", "ocpSubscriptionId", "id"):
+        value = detail.get(key_name)
+        if value:
+            return str(value)
+    return None
+
+
+def _subscription_details_for_sku(sku: dict, subscription_lookup: dict) -> list[dict]:
+    subscription_ids = sku.get("subscriptionIds") or []
+    details: list[dict] = []
+    seen: set[str] = set()
+
+    def add_detail(subscription_id: object, detail: dict, match_source: str) -> None:
+        detail_id = _subscription_detail_id(detail) or str(subscription_id)
+        key = _subscription_key(detail_id)
+        if key and key in seen:
+            return
+        if key:
+            seen.add(key)
+        details.append(
+            {
+                "subscriptionId": str(subscription_id or detail_id),
+                **detail,
+                "lifecycleMatchSource": match_source,
+            }
+        )
+
+    for subscription_id in subscription_ids:
+        key = _subscription_key(subscription_id)
+        if not key:
+            continue
+        detail = subscription_lookup["by_id"].get(key)
+        if detail:
+            add_detail(subscription_id, detail, "subscriptionIds")
+
+    if details:
+        return details
+
+    sku_id_key = _subscription_key(sku.get("skuId"))
+    if sku_id_key:
+        for detail in subscription_lookup["by_sku_id"].get(sku_id_key, []):
+            add_detail(_subscription_detail_id(detail), detail, "skuId")
+
+    if details:
+        return details
+
+    sku_part_key = _subscription_key(sku.get("skuPartNumber"))
+    if sku_part_key:
+        for detail in subscription_lookup["by_sku_part_number"].get(sku_part_key, []):
+            add_detail(_subscription_detail_id(detail), detail, "skuPartNumber")
+
+    return details
 
 
 async def _fetch_tenant(mapping, client: httpx.AsyncClient, semaphore: asyncio.Semaphore):
@@ -135,13 +202,10 @@ async def _fetch_tenant(mapping, client: httpx.AsyncClient, semaphore: asyncio.S
             total_units = enabled + warning + suspended + locked_out
             available = max(enabled - assigned, 0)
             subscription_ids = sku.get("subscriptionIds") or []
-            subscription_details = [
-                {
-                    "subscriptionId": subscription_id,
-                    **subscription_lookup.get(_subscription_key(subscription_id) or "", {}),
-                }
-                for subscription_id in subscription_ids
-            ]
+            subscription_details = _subscription_details_for_sku(
+                sku,
+                subscription_lookup,
+            )
             lifecycle_dates = [
                 detail.get("nextLifecycleDateTime")
                 for detail in subscription_details
