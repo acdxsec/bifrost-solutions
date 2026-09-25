@@ -7,8 +7,7 @@ import httpx
 from bifrost import integrations, tables, workflow
 
 
-INTEGRATION_NAME = "Microsoft 365 Graph"
-PARTNER_CENTER_SCOPE = "https://api.partnercenter.microsoft.com/.default"
+PARTNER_CENTER_INTEGRATION_NAME = "Microsoft Partner Center"
 PARTNER_CENTER_BASE = "https://api.partnercenter.microsoft.com/v1"
 TENANTS_TABLE = "m365_managed_tenants"
 INVENTORY_TABLE = "m365_license_inventory"
@@ -166,12 +165,11 @@ def _subscription_details_for_partner_sku(
 
 
 async def _partner_token() -> str:
-    partner = await integrations.get(
-        INTEGRATION_NAME,
-        oauth_scope=PARTNER_CENTER_SCOPE,
-    )
+    partner = await integrations.get(PARTNER_CENTER_INTEGRATION_NAME)
     if partner is None:
-        raise RuntimeError(f"Integration '{INTEGRATION_NAME}' is unavailable")
+        raise RuntimeError(
+            f"Integration '{PARTNER_CENTER_INTEGRATION_NAME}' is unavailable"
+        )
     if partner.oauth is None or not partner.oauth.access_token:
         raise RuntimeError("Partner Center access token is unavailable")
     return partner.oauth.access_token

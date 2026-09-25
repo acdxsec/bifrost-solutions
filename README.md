@@ -22,17 +22,22 @@ It uses one MSP Microsoft integration and Partner Center / GDAP customer access 
   - Reads stored inventory by default.
   - The Sync button runs a fresh Partner Center sync.
 
-## Required Existing Integration
+## Required Integration
 
-The Bifrost instance must already contain an integration named exactly:
+The solution uses an integration named exactly:
 
-`Microsoft 365 Graph`
+`Microsoft Partner Center`
 
-That integration must authenticate the MSP/partner tenant identity that can call Partner Center APIs for GDAP-managed customers.
+This is intentionally separate from any `Microsoft 365 Graph` integration. The Partner Center token is issued by the MSP partner tenant; customer tenant IDs are only used as Partner Center customer IDs in API paths.
 
-The workflow requests a Partner Center token with:
+Configure the integration with:
 
-`https://api.partnercenter.microsoft.com/.default`
+- Entity ID / default entity ID: the MSP partner tenant ID.
+- Authorization URL: `https://login.microsoftonline.com/{entity_id}/oauth2/v2.0/authorize`
+- Token URL: `https://login.microsoftonline.com/{entity_id}/oauth2/v2.0/token`
+- Delegated scopes:
+  - `https://api.partnercenter.microsoft.com/user_impersonation`
+  - `offline_access`
 
 ## Microsoft Access Model
 
@@ -42,6 +47,7 @@ This package assumes:
 - Customer tenants are managed through GDAP / partner relationships.
 - The MSP identity has the Partner Center and customer roles needed to read customer subscription/license data.
 - The dashboard does not require a separate customer admin-consent flow for each tenant.
+- The workflow authenticates once to the MSP partner tenant, then calls customer-scoped Partner Center endpoints.
 
 The workflow calls:
 

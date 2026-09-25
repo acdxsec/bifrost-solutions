@@ -1,0 +1,15 @@
+connections:
+  microsoft_partner_center:
+    integration_name: Microsoft Partner Center
+    position: 0
+    template:
+      entity_id_name: Partner tenant ID
+      oauth:
+        provider_name: Microsoft Partner Center
+        display_name: Microsoft Partner Center
+        oauth_flow_type: authorization_code
+        authorization_url: https://login.microsoftonline.com/{entity_id}/oauth2/v2.0/authorize
+        token_url: https://login.microsoftonline.com/{entity_id}/oauth2/v2.0/token
+        scopes:
+          - https://api.partnercenter.microsoft.com/user_impersonation
+          - offline_access
