@@ -69,6 +69,8 @@ This is an **internal MSP dashboard**. It follows the existing solution's authen
 
 ## Development and validation
 
+To create a ZIP for Bifrost's Install Solution dialog, commit the intended source and run `python scripts/package_solution.py /path/to/solution-install.zip` from the repository. The package must contain `bifrost.solution.yaml` and `.bifrost/` at the **archive root**, without an enclosing repository folder. GitHub's source ZIP and `git archive --prefix` packages are not directly installable. An incorrectly nested archive can appear as an empty package and trigger a misleading password error in the installer. This shareable package is not encrypted and requires no backup password.
+
 Python tests use fake Bifrost storage and real `httpx` with a mock transport:
 
 ```sh
