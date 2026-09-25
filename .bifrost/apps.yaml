@@ -11,3 +11,14 @@ apps:
     roles: []
     role_names: null
     path: apps/m365-license-dashboard
+  aa2ec2ab-861b-4536-92e4-321c3a8a7dfc:
+    id: aa2ec2ab-861b-4536-92e4-321c3a8a7dfc
+    slug: group-reference-dashboard
+    name: Security Group References
+    description: Find direct Entra and Intune references with per-category scan coverage.
+    app_model: standalone_v2
+    dependencies: {}
+    access_level: authenticated
+    roles: []
+    role_names: null
+    path: apps/group-reference-dashboard

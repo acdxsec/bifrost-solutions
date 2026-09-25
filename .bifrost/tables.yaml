@@ -107,3 +107,48 @@ tables:
       - name: solution_authenticated_access
         actions: [read, create, update, delete]
         when: null
+  f5c7148c-17e8-49f0-9f47-64a4e9bc2b8b:
+    id: f5c7148c-17e8-49f0-9f47-64a4e9bc2b8b
+    name: group_reference_state
+    description: Customer catalog, scan progress, coverage and atomic tenant locks.
+    schema:
+      type: object
+      properties: {}
+    policies:
+    - name: solution_authenticated_access
+      actions:
+      - read
+      - create
+      - update
+      - delete
+      when: null
+  ee082857-f1a8-454e-a451-d4625f34c5a7:
+    id: ee082857-f1a8-454e-a451-d4625f34c5a7
+    name: group_reference_groups
+    description: Security group summaries partitioned by immutable snapshot.
+    schema:
+      type: object
+      properties: {}
+    policies:
+    - name: solution_authenticated_access
+      actions:
+      - read
+      - create
+      - update
+      - delete
+      when: null
+  16780d16-557c-4830-b394-28af510c22e2:
+    id: 16780d16-557c-4830-b394-28af510c22e2
+    name: group_reference_findings
+    description: Direct reference evidence partitioned by immutable snapshot.
+    schema:
+      type: object
+      properties: {}
+    policies:
+    - name: solution_authenticated_access
+      actions:
+      - read
+      - create
+      - update
+      - delete
+      when: null

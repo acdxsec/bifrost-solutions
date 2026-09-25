@@ -26,3 +26,39 @@ workflows:
     description: Discover GDAP-managed Partner Center customers and store them as managed tenants.
     access_level: authenticated
     timeout_seconds: 600
+  bd3fb9ae-7ef0-40c6-9333-1ff9fa9af1a4:
+    id: bd3fb9ae-7ef0-40c6-9333-1ff9fa9af1a4
+    name: group_reference_inventory
+    path: functions/group_references.py
+    function_name: group_reference_inventory
+    type: workflow
+    description: Read cached customer group summaries and scan coverage.
+    access_level: authenticated
+    timeout_seconds: 120
+  d771992c-7bbd-4601-bf62-03316a22d960:
+    id: d771992c-7bbd-4601-bf62-03316a22d960
+    name: group_reference_details
+    path: functions/group_references.py
+    function_name: group_reference_details
+    type: workflow
+    description: Read reference evidence for one group in a specific snapshot.
+    access_level: authenticated
+    timeout_seconds: 120
+  1607f828-2b08-41eb-be62-4cedd7291102:
+    id: 1607f828-2b08-41eb-be62-4cedd7291102
+    name: group_reference_discover
+    path: functions/group_references.py
+    function_name: group_reference_discover
+    type: workflow
+    description: Discover Partner Center customers for group reference scans.
+    access_level: authenticated
+    timeout_seconds: 600
+  b167f4d4-0b8e-4b7b-9cf9-1273075f31a7:
+    id: b167f4d4-0b8e-4b7b-9cf9-1273075f31a7
+    name: group_reference_scan
+    path: functions/group_references.py
+    function_name: group_reference_scan
+    type: workflow
+    description: Scan direct security group references in one discovered customer tenant.
+    access_level: authenticated
+    timeout_seconds: 1800
