@@ -1,10 +1,14 @@
 # Microsoft 365 License Dashboard
 
-This Bifrost Solution is an MSP-oriented Microsoft 365 license dashboard.
+This Bifrost Solution includes an MSP Microsoft 365 license dashboard and a **Security Group References** dashboard.
 
-It uses one MSP Microsoft integration and Partner Center / GDAP customer access instead of one Bifrost organization per customer tenant.
+Both dashboards use Partner Center customer discovery instead of one Bifrost organization per customer tenant. Licensing uses the existing Partner Center integration. Group References adds a separate Microsoft Graph delegated connection and requires customer consent and GDAP roles.
+
+See [Group References setup, coverage and operation](docs/group-references.md) for the new dashboard. The licensing setup below is unchanged; its statements about consent apply only to Partner Center licensing reads.
 
 ## What It Installs
+
+In addition to the licensing resources below, version 0.2.0 installs the Security Group References app, four `group_reference_*` workflows, three snapshot/state tables and a Microsoft Graph connection template. Existing resource IDs and the solution slug are preserved.
 
 - `m365_discover_gdap_customers`
   - Reads Partner Center customers.

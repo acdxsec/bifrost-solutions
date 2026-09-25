@@ -13,3 +13,25 @@ connections:
         scopes:
           - https://api.partnercenter.microsoft.com/user_impersonation
           - offline_access
+  microsoft_graph_group_references:
+    integration_name: Microsoft Graph Group References
+    position: 1
+    template:
+      entity_id_name: Partner tenant ID
+      oauth:
+        provider_name: Microsoft Graph Group References
+        display_name: Microsoft Graph Group References
+        oauth_flow_type: authorization_code
+        authorization_url: https://login.microsoftonline.com/{entity_id}/oauth2/v2.0/authorize
+        token_url: https://login.microsoftonline.com/{entity_id}/oauth2/v2.0/token
+        scopes:
+        - https://graph.microsoft.com/Directory.Read.All
+        - https://graph.microsoft.com/Policy.Read.All
+        - https://graph.microsoft.com/RoleManagement.Read.Directory
+        - https://graph.microsoft.com/DeviceManagementConfiguration.Read.All
+        - https://graph.microsoft.com/DeviceManagementApps.Read.All
+        - https://graph.microsoft.com/DeviceManagementServiceConfig.Read.All
+        - https://graph.microsoft.com/DeviceManagementRBAC.Read.All
+        - https://graph.microsoft.com/DeviceManagementScripts.Read.All
+        - https://graph.microsoft.com/CloudPC.Read.All
+        - offline_access
